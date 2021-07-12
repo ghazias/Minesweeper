@@ -1,9 +1,10 @@
 #include <iostream>
+#include <string>
 #include <utility>
 #include <vector>
-#include <string>
 
 #define REAL_GAME 0
+#define ESCAPE_CHOICE -1, -1  // how to properly declare?
 
 enum class GameResult { WIN, LOSE };
 
@@ -38,6 +39,7 @@ class Board {
   const std::vector<std::vector<Tile>> &tiles() const { return tiles_; };
   std::vector<std::vector<Tile>>
       tiles_;  // each vector in this vector is a row of tiles
+               // with the entirety of the vector representing the board
 
   bool is_bomb(int row, int col) const {
     return tiles()[row - 1][col - 1].is_bomb();
@@ -48,15 +50,31 @@ class Board {
 
   void select(int row, int col) {
     Tile my_tile = tiles()[row - 1][col - 1];
-    my_tile.set_is_revealed(true);
+    char choice{};
+
+    do {
+      std::cout << "F to flag or S to select: ";
+      std::cin >> choice;
+
+    } while (choice != "F" || choice != "S")
+
+        if (choice == "F") {
+      my_tile.set_is_flagged(true);
+    }
+    else {  // TODO reveal adjacent empty tiles
+      my_tile.set_is_revealed(true);
+    }
   }
 
   bool is_clear() const { return !(remaining_tiles() - total_bomb_count()); }
 
  private:
-  int total_bomb_count_{}; // TODO make const?
+  int total_bomb_count_{};  // TODO make const?
   int remaining_tiles_{};
 };
+
+// factory function
+// TODO maybe build into constructor?
 
 Tile create_bomb() {
   Tile bomb_tile{};
@@ -69,7 +87,8 @@ Board create_board(int width, int height, int total_bomb_count) {
   return Board{width, height, total_bomb_count};
 }
 
-std::pair<int, int> get_user_choice(const Board &board) { // why take board param?
+std::pair<int, int> get_user_choice(
+    const Board &board) {  // why take board param?
   std::pair<int, int> choice{};
 
   std::cout << "Pick a coordinate to reveal.";
@@ -84,6 +103,7 @@ std::pair<int, int> get_user_choice(const Board &board) { // why take board para
 std::string display_helper(const std::vector<Tile> &row) {}  // TODO
 
 void display(const Board &board) {
+  // TODO add timer and number of bomb counters as headers to board
   for (const auto &row : board.tiles()) {
     for (const auto &tile : row) {
       if (tile.is_flagged()) {
@@ -105,11 +125,15 @@ void display(const Board &board) {
 GameResult play_game(Board &board) {
   while (true) {
     display(board);
-    auto [row, column] = get_user_choice(board);
+    auto [row, column] =
+        get_user_choice(board);  // how to properly access this variable?
+    if ((row, column) == ESCAPE_CHOICE) {
+      return 0;
+    }
+    board.select(row, column);
     if (board.is_bomb(row, column)) {
       return GameResult::LOSE;
     }  // lose state
-    board.select(row, column);
     if (board.is_clear()) {
       return GameResult::WIN;
     }  // win state
@@ -125,8 +149,19 @@ void game_over(GameResult result) {
   // TODO maybe add cout for time taken?
 }
 
-int main(int, char* argv[]) {
-  #if REAL_GAME 
+int main(int, char *argv[]) {
+/*
+// Initialize board to size/difficulty
+// Display
+// Begin game loop until gameResult or escape input is returned, each loop check
+if board_unrevealed_spaces - bomb_total = 0 and return win if true
+//    Select
+//      Flag space
+//      Reveal space (if first reveal, start timer)
+//        if empty space, reveal adjacent empty tiles in all directions
+(cardinal or omni-directional traversal?) if bomb return Loss
+*/
+#if REAL_GAME
   switch (std::stoi(argv[1])) {
     case 1:
       create_board(9, 9, 10);
@@ -142,8 +177,9 @@ int main(int, char* argv[]) {
       std::cout << "1 for easy, 2 for medium, 3 for hard\n";
       return 1;
   }
-  #endif
+#endif
 
+#if !REAL_GAME
   auto board = create_board(0, 0, 0);
   board.tiles_.push_back({});
   auto &row = board.tiles_.back();
@@ -164,10 +200,11 @@ int main(int, char* argv[]) {
   std::cout << "-----------------\n";
   display(board);
   std::cout << "-----------------\n";
+#endif
 
 #if REAL_GAME
-	auto board = create_board(10, 15, 7);
-	auto result = play_game(board);
-	game_over(result);
+  auto board = create_board(10, 15, 7);
+  auto result = play_game(board);
+  game_over(result);
 #endif
 }
