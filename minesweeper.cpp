@@ -46,6 +46,15 @@ class Board {
 
   void flood(int row, int col) {
     Tile &current = tiles_[row - 1][col - 1];
+    if (row == 0 || col == 0 || row == tiles().size() ||
+        col == tiles()[0].size()) {
+      if (current.bomb_count()) {
+        current.set_is_revealed(true);
+      }
+
+      return;
+    }
+
     if (current.bomb_count()) {
       current.set_is_revealed(true);
       return;
@@ -53,9 +62,9 @@ class Board {
 
     current.set_is_revealed(true);
 
-    for (std::size_t i = row - 1; i < row + 1; ++i) {
-      for (std::size_t j = col - 1; j < col + 1; ++j) {
-        if (i == row && j == col) {  // skip self
+    for (int i = row - 1; i < row + 1; ++i) {    // changed from size_t to int
+      for (int j = col - 1; j < col + 1; ++j) {  // to suppress warning
+        if (i == row && j == col) { // skip self
           continue;
         }
         flood(i, j);
