@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -Wall -Wextra -pedantic -g -std=c++17
+CXXFLAGS = -Wall -Wextra -pedantic -g -std=c++20 
 LINK.o = $(LINK.cc)
 TEST_OBJS = minesweeper.o
 
