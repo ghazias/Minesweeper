@@ -28,6 +28,7 @@ class Tile {
   int bomb_count_{};
   bool is_flagged_{};
 };
+
 std::pair<int, int> gen_coord(std::size_t width, std::size_t height) {
   return {rand() % height, rand() % width};
 }
@@ -53,6 +54,7 @@ class Board {
     for (const auto &[row, col] : bomb_tiles_) {
       tiles_[row][col].set_is_bomb(true);
     }
+    set_bomb_counts();
   }
   const std::vector<std::vector<Tile>> &tiles() const { return tiles_; };
   const std::set<std::pair<int, int>> &bomb_tiles() const {
@@ -65,12 +67,12 @@ class Board {
     }
   }
 
-  bool is_edge(std::size_t row, std::size_t col, int width, int height) {
-    return (row > 0 && row < height) && (col > 0 && col < width);
+  bool is_edge(std::size_t row, std::size_t col) {
+    return (row > 0 && row < height()) && (col > 0 && col < width());
   }
 
-  bool is_corner(std::size_t row, std::size_t col, int width, int height) {
-    return (row == 0 || row == height) && (col == 0 || col == width);
+  bool is_corner(std::size_t row, std::size_t col) {
+    return (row == 0 || row == height()) && (col == 0 || col == width());
   }
 
   std::size_t count_col(std::size_t row, std::size_t col, Columns direction) {
@@ -127,9 +129,8 @@ class Board {
     std::size_t window_count{};
     for (std::size_t i = 0; i < board_height; ++i) {
       for (std::size_t j = 0; j < board_width; ++j) {
-        if (!is_edge(i, j, board_width,
-                     board_height)) {  // is interior of board
-          if (j > 1) {                 // count can use sliding window
+        if (!is_edge(i, j)) {  // is interior of board
+          if (j > 1) {         // count can use sliding window
             std::size_t temp = count_col(
                 i, j,
                 Columns::CENTER);  // temp variable so window only needs to be
@@ -147,11 +148,10 @@ class Board {
                 tiles()[i][j].is_bomb();  // adding window's previous self bomb
                                           // to the count if present
           }
-        } else {  // TODO edge tile counting
-                  // there's probably a better way to do this
-          if (!is_corner(i, j, board_width,
-                         board_height)) {  // is edge of board, but not corner
-                         
+        } else {                   // TODO edge tile counting
+                                   // there's probably a better way to do this
+          if (!is_corner(i, j)) {  // is edge of board, but not corner
+
           } else {           // is corner of board
             if (i == 0) {    // first row
               if (j == 0) {  // first col
@@ -182,7 +182,11 @@ class Board {
   int total_bomb_count() const { return total_bomb_count_; }
   std::size_t remaining_tiles() const { return remaining_tiles_; }
 
-  void flood(int row, int col) {
+  void flood(std::size_t row, std::size_t col) {
+    if (row < 0 || col < 0 || row == height() || col == width()) {
+      return;
+    }  // boundary checking
+
     Tile &current = tiles_[row][col];
 
     if (!current.is_bomb() && !current.is_revealed()) {
@@ -191,10 +195,9 @@ class Board {
       return;
     }  // check if valid space to reveal
 
-    if (row < 0 || col < 0 || row == height() || col == width() ||
-        !current.is_blank()) {
+    if (!current.is_blank()) {
       return;
-    }  // boundary checking
+    }
 
     for (auto i = row - 1; i < row + 1; ++i) {
       for (auto j = col - 1; j < col + 1; ++j) {
@@ -223,8 +226,8 @@ class Board {
     }
   }
 
-  int width() const { return tiles()[0].size(); }
-  int height() const { return tiles().size(); }
+  std::size_t width() const { return tiles()[0].size(); }
+  std::size_t height() const { return tiles().size(); }
   bool is_clear() const { return !(remaining_tiles() - total_bomb_count()); }
 
  private:
@@ -235,7 +238,7 @@ class Board {
 };
 
 std::pair<int, int> get_user_choice(const Board &board) {
-  std::pair<int, int> choice{};  // shouldn't I take size_t's?
+  std::pair<int, int> choice{};  // couldn't I take size_t's?
   do {
     std::cout << "Pick a coordinate to reveal.\n";
     std::cout << "Enter row: ";
@@ -243,8 +246,10 @@ std::pair<int, int> get_user_choice(const Board &board) {
 
     std::cout << "Enter col: ";
     std::cin >> choice.second;
-  } while (!(choice.first >= 0 && choice.first <= board.tiles().size()) &&
-           !(choice.second >= 0 && choice.second <= board.tiles()[0].size()));
+  } while (!(choice.first >= 0 &&
+             static_cast<std::size_t>(choice.first) <= board.tiles().size()) &&
+           !(choice.second >= 0 && static_cast<std::size_t>(choice.second) <=
+                                       board.tiles()[0].size()));
 
   return choice;
 }
