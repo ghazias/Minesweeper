@@ -6,8 +6,6 @@
 
 enum class GameResult { WIN, LOSE };
 enum class GameAction { FLAG, UNFLAG, REVEAL };
-enum class Columns { LEFT, CENTER, RIGHT };
-enum class Corners { TOPLEFT, TOPRIGHT, BOTLEFT, BOTRIGHT };
 
 class Tile {
  public:
@@ -67,6 +65,10 @@ class Board {
     }
   }
 
+  void decrement_remaining() {
+    --remaining_tiles_;
+  }
+
   bool is_edge(std::size_t row, std::size_t col) {
     return (row > 0 && row < height()) && (col > 0 && col < width());
   }
@@ -75,105 +77,63 @@ class Board {
     return (row == 0 || row == height()) && (col == 0 || col == width());
   }
 
-  std::size_t count_col(std::size_t row, std::size_t col, Columns direction) {
-    std::size_t count{};
-    if (direction == Columns::LEFT) {
-      for (std::size_t i = row - 1; i < row + 1; ++i) {
-        if (tiles()[i][col - 1].is_bomb()) {
-          ++count;
-        }
-      }
-    } else if (direction == Columns::RIGHT) {
-      for (std::size_t i = row - 1; i < row + 1; ++i) {
-        if (tiles()[i][col + 1].is_bomb()) {
-          ++count;
-        }
-      }
-    } else if (direction == Columns::CENTER) {  // CENTER
-      for (std::size_t i = row - 1; i < row + 1; ++i) {
-        if (tiles()[i][col].is_bomb() && i != row) {
-          ++count;
-        }
-      }
-    }
-
-    return count;
-  }
-
-  std::size_t corner_count(std::size_t row, std::size_t col, Corners corner) {
-    switch (corner) {
-      case Corners::TOPLEFT:
-        return tiles()[row][col + 1].is_bomb() +
-               tiles()[row + 1][col].is_bomb() +
-               tiles()[row + 1][col + 1].is_bomb();
-      case Corners::TOPRIGHT:
-        return tiles()[row][col - 1].is_bomb() +
-               tiles()[row + 1][col].is_bomb() +
-               tiles()[row + 1][col - 1].is_bomb();
-      case Corners::BOTLEFT:
-        return tiles()[row][col + 1].is_bomb() +
-               tiles()[row - 1][col].is_bomb() +
-               tiles()[row - 1][col + 1].is_bomb();
-      case Corners::BOTRIGHT:
-        return tiles()[row][col - 1].is_bomb() +
-               tiles()[row - 1][col].is_bomb() +
-               tiles()[row - 1][col - 1].is_bomb();
-    }
-  }
-
   // TODO add member variables to each tile containing location coordinates and
   // refactor count_col as a tile member which only takes direction maybe also
   // add member bool labels to mark corners and edges?
   void set_bomb_counts() {
-    std::size_t board_width = width(), board_height = height();  // cols, rows
-    std::size_t window_count{};
-    for (std::size_t i = 0; i < board_height; ++i) {
-      for (std::size_t j = 0; j < board_width; ++j) {
-        if (!is_edge(i, j)) {  // is interior of board
-          if (j > 1) {         // count can use sliding window
-            std::size_t temp = count_col(
-                i, j,
-                Columns::CENTER);  // temp variable so window only needs to be
-                                   // calculated once from helper function
-
-            tiles_[i][j].set_bomb_count(window_count + temp +
-                                        count_col(i, j, Columns::RIGHT));
-            window_count = temp;  // slide window
-          } else {                // bootstrap sliding window count
-            window_count = count_col(i, j, Columns::CENTER);
-            tiles_[i][j].set_bomb_count(count_col(i, j, Columns::LEFT) +
-                                        window_count +
-                                        count_col(i, j, Columns::RIGHT));
-            window_count +=
-                tiles()[i][j].is_bomb();  // adding window's previous self bomb
-                                          // to the count if present
-          }
-        } else {                   // TODO edge tile counting
-                                   // there's probably a better way to do this
-          if (!is_corner(i, j)) {  // is edge of board, but not corner
-
-          } else {           // is corner of board
-            if (i == 0) {    // first row
-              if (j == 0) {  // first col
-                tiles_[i][j].set_bomb_count(
-                    corner_count(i, j, Corners::TOPLEFT));
-              } else {  // last col
-                tiles_[i][j].set_bomb_count(
-                    corner_count(i, j, Corners::TOPRIGHT));
-              }
-            } else {         // last row
-              if (j == 0) {  // first col
-                tiles_[i][j].set_bomb_count(
-                    corner_count(i, j, Corners::BOTLEFT));
-              } else {  // last col
-                tiles_[i][j].set_bomb_count(
-                    corner_count(i, j, Corners::BOTRIGHT));
-              }
-            }
-          }
-        }
+    for (std::size_t row = 0; row < height(); ++row) {
+      for (std::size_t col = 0; col < width(); ++col) {
+        auto count = count_surrounding_bombs(row, col);
+        tiles_[row][col].set_bomb_count(count);
       }
     }
+  }
+  #if 0
+    void set_bomb_counts() {
+    for (std::size_t row = 0; row < height(); ++row) {
+      int previous_count{};
+      int current_count = count_bombs_in_column(row, 0);
+      for (std::size_t col = 0; col < width(); ++col) {
+        int next_count = count_bombs_in_column(row, col+1);
+        auto total = previous_count + current_count + next_count;
+        tiles_[row][col].set_bomb_count(total);
+        previous_count = current_count;
+        current_count = next_count;
+      }
+    }
+  }
+  
+  int count_bombs_in_column(int row, int col) const {
+      int count{};
+      for (int i = row-1; i <= row + 1; ++i) {
+          if (is_in_bounds(i, col) 
+            && tiles_[i][col].is_bomb()) {
+              ++count;
+          }
+      }
+      return count;
+  }
+  #endif
+
+
+  int count_surrounding_bombs(int row, int col) const {
+      int count{};
+      for (int i = row-1; i <= row + 1; ++i) {
+          for (int j = col - 1; j <= col + 1; ++j) {
+              if (is_in_bounds(i, j)
+                && tiles_[i][j].is_bomb()) {
+                  ++count;
+              }
+          }
+      }
+      return count;
+  }
+  
+  bool is_in_bounds(int row, int col) const {
+      return row >= 0 
+                && col >= 0 
+                && row < static_cast<int>(height()) 
+                && col < static_cast<int>(width());
   }
 
   bool is_bomb(std::size_t row, std::size_t col) const {
@@ -259,6 +219,7 @@ GameAction get_user_action() {
   std::cout << "Enter action.\n";
   std::cout << "(R)eveal, (F)lag, (U)nflag: ";
   std::cin >> choice;
+  std::cout << "\n";
   if (choice == 'R') {
     return GameAction::REVEAL;
   } else if (choice == 'F') {
@@ -280,6 +241,8 @@ void display(const Board &board) {
        ++col_label) {
     std::cout << " " << col_label;
   }
+  
+  std::cout << "\tRemaining tiles: " << board.remaining_tiles();
   std::cout << "\n";
   print_header(board.tiles().size());
   std::cout << "\n";
@@ -316,6 +279,7 @@ GameResult play_game(Board &board) {
       return GameResult::LOSE;
     }  // lose state
     board.select(row, column, action);
+    board.decrement_remaining();
     if (board.is_clear()) {
       return GameResult::WIN;
     }  // win state
@@ -324,9 +288,9 @@ GameResult play_game(Board &board) {
 
 void game_over(GameResult result, Board &board) {
   if (result == GameResult::LOSE) {
-    std::cout << "You blew it... Game over.\n";
     board.reveal_all_bombs();
     display(board);
+    std::cout << "You blew it... Game over.\n";
   } else {
     std::cout << "Congrats! You won!";
   }
